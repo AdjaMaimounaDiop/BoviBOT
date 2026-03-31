@@ -1,14 +1,18 @@
 """
-BoviBot — Squelette Backend FastAPI
+BoviBot — Backend FastAPI
 Gestion d'élevage bovin avec LLM + PL/SQL
 Projet L3 — ESP/UCAD
 """
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
+from dotenv import load_dotenv
 import mysql.connector
 import os, re, json, httpx
+
+load_dotenv()
 
 app = FastAPI(title="BoviBot API", version="1.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -46,8 +50,12 @@ Procédures disponibles :
 - sp_declarer_vente(animal_id, acheteur, telephone, prix_fcfa, poids_vente_kg, date_vente)
 """
 
-SYSTEM_PROMPT = f"""Tu es BoviBot, l'assistant IA d'un élevage bovin.
+import datetime
+TODAY = datetime.date.today().strftime("%Y-%m-%d")
+
+SYSTEM_PROMPT = f"""Tu es BoviBot, l'assistant IA d'un élevage bovin au Sénégal.
 Tu aides l'éleveur à gérer son troupeau en langage naturel.
+Date du jour : {TODAY}
 
 {DB_SCHEMA}
 
@@ -82,7 +90,7 @@ def execute_query(sql: str):
         cursor.close(); conn.close()
 
 def call_procedure(name: str, params: dict):
-    """Appelle une procédure stockée PL/SQL"""
+    """Appelle une procédure stockée PL/SQL et retourne les infos post-exécution."""
     conn = get_db()
     cursor = conn.cursor()
     try:
@@ -91,16 +99,49 @@ def call_procedure(name: str, params: dict):
                 params["animal_id"], params["poids_kg"],
                 params["date"], params.get("agent", "BoviBot")
             ])
+            conn.commit()
+            cursor.close()
+            # Récupérer GMQ et tag après la pesée
+            cursor2 = conn.cursor(dictionary=True)
+            cursor2.execute(
+                "SELECT numero_tag, nom, fn_gmq(%s) as gmq FROM animaux WHERE id=%s",
+                (params["animal_id"], params["animal_id"])
+            )
+            info = cursor2.fetchone()
+            cursor2.close()
+            gmq = info["gmq"] if info else None
+            tag = info["numero_tag"] if info else ""
+            msg = f"Pesée enregistrée pour {tag}."
+            if gmq is not None:
+                msg += f" GMQ actuel : {float(gmq):.3f} kg/jour."
+                if float(gmq) < 0.3:
+                    msg += " ⚠️ GMQ faible — alerte générée."
+            return {"success": True, "answer": msg}
+
         elif name == "sp_declarer_vente":
             cursor.callproc("sp_declarer_vente", [
                 params["animal_id"], params["acheteur"],
                 params.get("telephone", ""), params["prix_fcfa"],
                 params.get("poids_vente_kg", 0), params["date_vente"]
             ])
-        conn.commit()
-        return {"success": True}
+            conn.commit()
+            cursor.close()
+            cursor2 = conn.cursor(dictionary=True)
+            cursor2.execute("SELECT numero_tag, nom FROM animaux WHERE id=%s", (params["animal_id"],))
+            info = cursor2.fetchone()
+            cursor2.close()
+            tag = info["numero_tag"] if info else ""
+            msg = f"Vente enregistrée : {tag} vendu à {params['acheteur']} pour {int(params['prix_fcfa']):,} FCFA. Statut mis à jour : vendu."
+            return {"success": True, "answer": msg}
+
+        return {"success": True, "answer": "Action effectuée avec succès."}
+    except mysql.connector.Error as e:
+        conn.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
     finally:
-        cursor.close(); conn.close()
+        try: cursor.close()
+        except: pass
+        conn.close()
 
 # ── Appel LLM ──────────────────────────────────────────────────
 async def ask_llm(question: str, history: list = []) -> dict:
@@ -116,10 +157,20 @@ async def ask_llm(question: str, history: list = []) -> dict:
         )
         r.raise_for_status()
         content = r.json()["choices"][0]["message"]["content"]
+        # Essai 1 : contenu JSON direct
+        try:
+            return json.loads(content)
+        except json.JSONDecodeError:
+            pass
+        # Essai 2 : JSON dans un bloc ```json ... ```
+        match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', content, re.DOTALL)
+        if match:
+            return json.loads(match.group(1))
+        # Essai 3 : premier objet JSON dans le texte
         match = re.search(r'\{.*\}', content, re.DOTALL)
         if match:
             return json.loads(match.group())
-        raise ValueError("Réponse LLM invalide")
+        raise ValueError(f"Réponse LLM non analysable : {content[:200]}")
 
 # ── Routes API ──────────────────────────────────────────────────
 class ChatMessage(BaseModel):
@@ -134,7 +185,7 @@ async def chat(msg: ChatMessage):
         # Si l'utilisateur confirme une action en attente
         if msg.confirm_action and msg.pending_action:
             result = call_procedure(msg.pending_action["action"], msg.pending_action["params"])
-            return {"type": "action_done", "answer": "Action effectuée avec succès !", "data": []}
+            return {"type": "action_done", "answer": result.get("answer", "Action effectuée avec succès !"), "data": []}
 
         llm = await ask_llm(msg.question, msg.history)
         t = llm.get("type", "info")
@@ -194,7 +245,7 @@ def get_animaux():
 @app.get("/api/alertes")
 def get_alertes():
     return execute_query("""
-        SELECT al.*, a.numero_tag, a.nom as animal_nom
+        SELECT al.*, a.numero_tag as animal_tag, a.nom as animal_nom
         FROM alertes al
         LEFT JOIN animaux a ON al.animal_id = a.id
         WHERE al.traitee = FALSE
@@ -226,7 +277,19 @@ def get_gestations():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "app": "BoviBot"}
+    try:
+        conn = get_db()
+        conn.close()
+        db_ok = True
+    except Exception:
+        db_ok = False
+    return {"status": "ok", "app": "BoviBot", "db": "connected" if db_ok else "error"}
+
+@app.get("/", response_class=HTMLResponse)
+def serve_frontend():
+    html_path = os.path.join(os.path.dirname(__file__), "index.html")
+    with open(html_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(f.read())
 
 if __name__ == "__main__":
     import uvicorn

@@ -20,9 +20,11 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 # ── Configuration ───────────────────────────────────────────────
 DB_CONFIG = {
     "host":     os.getenv("DB_HOST", "localhost"),
+    "port":     int(os.getenv("DB_PORT", "3306")),
     "user":     os.getenv("DB_USER", "root"),
     "password": os.getenv("DB_PASSWORD", ""),
     "database": os.getenv("DB_NAME", "bovibot"),
+    "connection_timeout": 10,
 }
 LLM_API_KEY  = os.getenv("OPENAI_API_KEY", "")
 LLM_MODEL    = os.getenv("LLM_MODEL", "gpt-4o-mini")
@@ -149,13 +151,29 @@ async def ask_llm(question: str, history: list = []) -> dict:
     messages += history[-6:]  # contexte des 3 derniers échanges
     messages.append({"role": "user", "content": question})
     async with httpx.AsyncClient() as client:
-        r = await client.post(
-            f"{LLM_BASE_URL}/chat/completions",
-            headers={"Authorization": f"Bearer {LLM_API_KEY}"},
-            json={"model": LLM_MODEL, "messages": messages, "temperature": 0},
-            timeout=30,
-        )
-        r.raise_for_status()
+        try:
+            r = await client.post(
+                f"{LLM_BASE_URL}/chat/completions",
+                headers={"Authorization": f"Bearer {LLM_API_KEY}"},
+                json={"model": LLM_MODEL, "messages": messages, "temperature": 0},
+                timeout=30,
+            )
+            r.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            code = e.response.status_code
+            if code == 429:
+                raise HTTPException(
+                    status_code=429,
+                    detail=(
+                        "OpenAI limite les requetes (429). Verifiez le quota/facturation, "
+                        "attendez quelques secondes, puis reessayez."
+                    ),
+                )
+            if code == 401:
+                raise HTTPException(status_code=401, detail="Cle OpenAI invalide ou manquante.")
+            if code == 403:
+                raise HTTPException(status_code=403, detail="Acces OpenAI refuse pour ce compte ou ce modele.")
+            raise HTTPException(status_code=502, detail=f"Erreur OpenAI (HTTP {code}).")
         content = r.json()["choices"][0]["message"]["content"]
         # Essai 1 : contenu JSON direct
         try:
@@ -293,4 +311,5 @@ def serve_frontend():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app:app", host="0.0.0.0", port=8002, reload=True)
+    port = int(os.getenv("PORT", 8002))
+    uvicorn.run("app:app", host="0.0.0.0", port=port, reload=False)

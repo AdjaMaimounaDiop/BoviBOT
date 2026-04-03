@@ -70,5 +70,5 @@ Aller sur **http://localhost:8002**
 
 ## Vérification santé
 ```
-GET http://localhost:8002/health
+GET http://localhost:8002/health ou bien http://bovibot.mouhadev.com/
 ```

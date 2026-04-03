@@ -26,9 +26,12 @@ DB_CONFIG = {
     "database": os.getenv("DB_NAME", "bovibot"),
     "connection_timeout": 10,
 }
-LLM_API_KEY  = os.getenv("OPENAI_API_KEY", "")
-LLM_MODEL    = os.getenv("LLM_MODEL", "gpt-4o-mini")
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai").lower()
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4o-mini" if LLM_PROVIDER == "openai" else "gemini-1.5-flash")
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://api.openai.com/v1")
+GEMINI_BASE_URL = os.getenv("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta")
 
 # ── Schéma BDD pour le prompt ───────────────────────────────────
 DB_SCHEMA = """
@@ -146,15 +149,89 @@ def call_procedure(name: str, params: dict):
         conn.close()
 
 # ── Appel LLM ──────────────────────────────────────────────────
+def _extract_json_from_text(content: str) -> dict:
+    # Essai 1 : contenu JSON direct
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError:
+        pass
+
+    # Essai 2 : JSON dans un bloc ```json ... ```
+    match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', content, re.DOTALL)
+    if match:
+        return json.loads(match.group(1))
+
+    # Essai 3 : premier objet JSON dans le texte
+    match = re.search(r'\{.*\}', content, re.DOTALL)
+    if match:
+        return json.loads(match.group())
+
+    raise ValueError(f"Réponse LLM non analysable : {content[:200]}")
+
+
 async def ask_llm(question: str, history: list = []) -> dict:
+    history_slice = history[-6:]  # contexte des 3 derniers échanges
+
+    if LLM_PROVIDER == "gemini":
+        if not GEMINI_API_KEY:
+            raise HTTPException(status_code=401, detail="Cle Gemini manquante. Definis GEMINI_API_KEY.")
+
+        # Conversion de l'historique au format Gemini (roles: user/model)
+        gemini_contents = []
+        for m in history_slice:
+            role = "model" if m.get("role") == "assistant" else "user"
+            gemini_contents.append({"role": role, "parts": [{"text": str(m.get("content", ""))}]})
+        gemini_contents.append({"role": "user", "parts": [{"text": question}]})
+
+        payload = {
+            "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+            "contents": gemini_contents,
+            "generationConfig": {"temperature": 0},
+        }
+
+        async with httpx.AsyncClient() as client:
+            try:
+                r = await client.post(
+                    f"{GEMINI_BASE_URL}/models/{LLM_MODEL}:generateContent",
+                    params={"key": GEMINI_API_KEY},
+                    json=payload,
+                    timeout=30,
+                )
+                r.raise_for_status()
+            except httpx.HTTPStatusError as e:
+                code = e.response.status_code
+                if code == 429:
+                    raise HTTPException(
+                        status_code=429,
+                        detail="Gemini limite les requetes (429). Attends un peu ou verifie ton quota journalier.",
+                    )
+                if code == 401:
+                    raise HTTPException(status_code=401, detail="Cle Gemini invalide ou manquante.")
+                if code == 403:
+                    raise HTTPException(status_code=403, detail="Acces Gemini refuse pour ce compte ou ce modele.")
+                raise HTTPException(status_code=502, detail=f"Erreur Gemini (HTTP {code}).")
+
+        data = r.json()
+        try:
+            parts = data["candidates"][0]["content"]["parts"]
+            content = "\n".join(p.get("text", "") for p in parts if p.get("text"))
+        except Exception:
+            raise HTTPException(status_code=502, detail="Reponse Gemini inattendue.")
+
+        return _extract_json_from_text(content)
+
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-    messages += history[-6:]  # contexte des 3 derniers échanges
+    messages += history_slice
     messages.append({"role": "user", "content": question})
+
+    if not OPENAI_API_KEY:
+        raise HTTPException(status_code=401, detail="Cle OpenAI manquante. Definis OPENAI_API_KEY.")
+
     async with httpx.AsyncClient() as client:
         try:
             r = await client.post(
                 f"{LLM_BASE_URL}/chat/completions",
-                headers={"Authorization": f"Bearer {LLM_API_KEY}"},
+                headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
                 json={"model": LLM_MODEL, "messages": messages, "temperature": 0},
                 timeout=30,
             )
@@ -175,20 +252,7 @@ async def ask_llm(question: str, history: list = []) -> dict:
                 raise HTTPException(status_code=403, detail="Acces OpenAI refuse pour ce compte ou ce modele.")
             raise HTTPException(status_code=502, detail=f"Erreur OpenAI (HTTP {code}).")
         content = r.json()["choices"][0]["message"]["content"]
-        # Essai 1 : contenu JSON direct
-        try:
-            return json.loads(content)
-        except json.JSONDecodeError:
-            pass
-        # Essai 2 : JSON dans un bloc ```json ... ```
-        match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', content, re.DOTALL)
-        if match:
-            return json.loads(match.group(1))
-        # Essai 3 : premier objet JSON dans le texte
-        match = re.search(r'\{.*\}', content, re.DOTALL)
-        if match:
-            return json.loads(match.group())
-        raise ValueError(f"Réponse LLM non analysable : {content[:200]}")
+        return _extract_json_from_text(content)
 
 # ── Routes API ──────────────────────────────────────────────────
 class ChatMessage(BaseModel):

@@ -1,113 +1,284 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BoviBot — Assistant IA Élevage Bovin</title>
+
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Segoe UI', sans-serif; background: #f5f0e8; color: #1a202c; }
-  header { background: #7c4f1e; color: white; padding: 1rem 2rem; display: flex; align-items: center; gap: 1rem; }
-  header h1 { font-size: 1.4rem; }
-  .container { display: grid; grid-template-columns: 1fr 2fr; gap: 1.5rem; padding: 1.5rem; max-width: 1400px; margin: 0 auto; }
-  .card { background: white; border-radius: 12px; padding: 1.2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 1rem; }
-  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
-  .stat { background: #fdf6ec; border-radius: 8px; padding: 0.8rem; text-align: center; }
-  .stat .val { font-size: 1.8rem; font-weight: bold; color: #7c4f1e; }
-  .stat .lbl { font-size: 0.75rem; color: #64748b; }
-  .stat.critical .val { color: #dc2626; }
-  .chat-box { height: 380px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; background: #fafaf8; }
-  .msg { margin-bottom: 0.8rem; }
-  .msg.user .bubble { background: #7c4f1e; color: white; margin-left: auto; }
-  .msg.bot .bubble { background: white; border: 1px solid #e2e8f0; }
-  .msg.confirm .bubble { background: #fef9c3; border: 2px solid #f59e0b; }
-  .bubble { display: inline-block; padding: 0.6rem 1rem; border-radius: 12px; max-width: 85%; font-size: 0.9rem; line-height: 1.5; }
-  .msg.user { text-align: right; }
-  .confirm-btns { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
-  .btn-oui { background: #16a34a; color: white; border: none; border-radius: 6px; padding: 0.4rem 1rem; cursor: pointer; font-size: 0.9rem; }
-  .btn-non { background: #dc2626; color: white; border: none; border-radius: 6px; padding: 0.4rem 1rem; cursor: pointer; font-size: 0.9rem; }
-  .chat-input { display: flex; gap: 0.5rem; }
-  .chat-input input { flex: 1; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.7rem 1rem; font-size: 0.95rem; outline: none; }
-  .chat-input input:focus { border-color: #7c4f1e; }
-  .chat-input button { background: #7c4f1e; color: white; border: none; border-radius: 8px; padding: 0.7rem 1.2rem; cursor: pointer; }
-  .suggestions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.8rem; }
-  .suggestions button { background: #fdf6ec; color: #7c4f1e; border: 1px solid #d4a76a; border-radius: 20px; padding: 0.3rem 0.8rem; font-size: 0.78rem; cursor: pointer; }
-  .suggestions button:hover { background: #fde9c9; }
-  .sql-preview { background: #1e293b; color: #94a3b8; font-family: monospace; font-size: 0.75rem; padding: 0.5rem; border-radius: 6px; margin-top: 0.4rem; white-space: pre-wrap; }
-  .results table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
-  .results th { background: #7c4f1e; color: white; padding: 0.5rem; text-align: left; }
-  .results td { padding: 0.45rem 0.5rem; border-bottom: 1px solid #e2e8f0; }
-  .results tr:hover td { background: #fdf6ec; }
-  h2 { font-size: 1rem; color: #374151; margin-bottom: 0.8rem; }
-  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 600; }
-  .badge-green { background: #dcfce7; color: #166534; }
-  .badge-orange { background: #fff7ed; color: #9a3412; }
-  .badge-red { background: #fee2e2; color: #991b1b; }
-  .alerte-item { padding: 0.5rem 0.8rem; border-radius: 6px; margin-bottom: 0.4rem; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; }
-  .alerte-critical { background: #fee2e2; border-left: 4px solid #dc2626; }
-  .alerte-warning  { background: #fff7ed; border-left: 4px solid #f59e0b; }
-  .alerte-info     { background: #eff6ff; border-left: 4px solid #3b82f6; }
-  .alerte-item button { background: none; border: none; cursor: pointer; font-size: 1rem; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f2f1ee; color: #1c1c1e; min-height: 100vh; }
+
+header {
+  background: #1c1c1e;
+  padding: 0.85rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.header-left { display: flex; align-items: center; gap: 0.85rem; }
+.logo-mark {
+  width: 36px; height: 36px; border-radius: 8px;
+  background: #e8e0d0;
+  display: flex; align-items: center; justify-content: center;
+}
+.logo-mark svg { width: 20px; height: 20px; }
+.header-title { font-size: 1rem; font-weight: 600; color: #f5f5f0; letter-spacing: 0.01em; }
+.header-sub { font-size: 0.7rem; color: #8a8a8a; margin-top: 1px; letter-spacing: 0.03em; }
+.header-badge { font-size: 0.72rem; color: #8a8a8a; background: #2c2c2e; padding: 0.3rem 0.9rem; border-radius: 20px; border: 1px solid #3a3a3c; }
+
+.layout { display: grid; grid-template-columns: 270px 1fr; gap: 1.25rem; padding: 1.25rem 1.5rem; }
+
+.card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 1.1rem 1.3rem;
+  border: 1px solid #e5e3df;
+  margin-bottom: 1rem;
+}
+.section-label {
+  font-size: 0.65rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.1em;
+  color: #a0a09a; margin-bottom: 0.9rem;
+}
+
+.stats-list { display: flex; flex-direction: column; gap: 0.45rem; }
+.stat-row {
+  display: flex; align-items: center;
+  padding: 0.6rem 0.85rem;
+  border-radius: 9px;
+  background: #f8f7f5;
+  border: 1px solid #edeae5;
+  gap: 0.7rem;
+}
+.stat-icon {
+  width: 28px; height: 28px; border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.stat-icon svg { width: 14px; height: 14px; }
+.stat-lbl { font-size: 0.78rem; color: #6b6b65; flex: 1; }
+.stat-val { font-size: 0.95rem; font-weight: 700; color: #1c1c1e; }
+.stat-val.danger { color: #c0392b; }
+.stat-val.success { color: #1a7a4a; }
+
+.alerte {
+  display: flex; align-items: flex-start; gap: 0.6rem;
+  padding: 0.65rem 0.85rem; border-radius: 9px;
+  margin-bottom: 0.45rem; font-size: 0.79rem;
+}
+.alerte-critical { background: #fdf0ef; border-left: 2px solid #c0392b; border-radius: 0 9px 9px 0; }
+.alerte-warning  { background: #fdf6eb; border-left: 2px solid #c87d2e; border-radius: 0 9px 9px 0; }
+.alerte-info     { background: #eff4fb; border-left: 2px solid #2d6fa3; border-radius: 0 9px 9px 0; }
+.alerte-dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
+.alerte-critical .alerte-dot { background: #c0392b; }
+.alerte-warning .alerte-dot  { background: #c87d2e; }
+.alerte-info .alerte-dot     { background: #2d6fa3; }
+.alerte-tag { font-weight: 600; font-size: 0.72rem; color: #1c1c1e; margin-bottom: 1px; }
+.alerte-msg { color: #4a4a44; line-height: 1.4; }
+.alerte-dismiss { margin-left: auto; background: none; border: none; cursor: pointer; color: #b0b0a8; font-size: 0.8rem; flex-shrink: 0; padding: 0 0 0 6px; }
+.alerte-dismiss:hover { color: #1a7a4a; }
+
+.gestation-row {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.5rem 0; border-bottom: 1px solid #f0ede8;
+  font-size: 0.79rem;
+}
+.gestation-row:last-child { border-bottom: none; }
+.g-bar { width: 3px; height: 28px; border-radius: 2px; background: #d0ccc5; flex-shrink: 0; }
+.g-bar.urgent { background: #c0392b; }
+.g-bar.ok { background: #1a7a4a; }
+.g-names { flex: 1; color: #4a4a44; }
+.g-names strong { color: #1c1c1e; font-weight: 600; }
+.g-tag { font-size: 0.7rem; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
+.g-tag.urgent { background: #fdf0ef; color: #c0392b; }
+.g-tag.ok { background: #edf7f2; color: #1a7a4a; }
+
+.suggestions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.9rem; }
+.suggestions button {
+  background: #f5f4f1; color: #3a3a36;
+  border: 1px solid #dedad4; border-radius: 20px;
+  padding: 0.3rem 0.85rem; font-size: 0.73rem;
+  cursor: pointer; font-family: inherit;
+  transition: background 0.12s, border-color 0.12s;
+}
+.suggestions button:hover { background: #eceae5; border-color: #ccc9c2; }
+
+.chat-box {
+  min-height: 300px; max-height: 350px;
+  overflow-y: auto; padding: 1rem;
+  background: #f8f7f5; border-radius: 10px;
+  border: 1px solid #e5e3df;
+  margin-bottom: 0.9rem;
+}
+.msg { margin-bottom: 0.7rem; display: flex; flex-direction: column; }
+.msg.user { align-items: flex-end; }
+.msg.bot, .msg.confirm { align-items: flex-start; }
+.bubble {
+  max-width: 80%; padding: 0.6rem 0.95rem;
+  font-size: 0.82rem; line-height: 1.55;
+}
+.msg.user .bubble {
+  background: #1c1c1e; color: #f5f5f0;
+  border-radius: 14px 14px 4px 14px;
+}
+.msg.bot .bubble {
+  background: #fff; color: #1c1c1e;
+  border-radius: 14px 14px 14px 4px;
+  border: 1px solid #e5e3df;
+}
+.msg.confirm .bubble {
+  background: #fdf6eb; color: #7a4a10;
+  border-radius: 14px; border: 1px solid #e8c98a;
+}
+.confirm-btns { display: flex; gap: 0.5rem; margin-top: 0.6rem; }
+.btn-oui {
+  background: #1a7a4a; color: #fff; border: none;
+  border-radius: 7px; padding: 0.38rem 1rem;
+  cursor: pointer; font-size: 0.78rem; font-weight: 600; font-family: inherit;
+}
+.btn-non {
+  background: #c0392b; color: #fff; border: none;
+  border-radius: 7px; padding: 0.38rem 1rem;
+  cursor: pointer; font-size: 0.78rem; font-weight: 600; font-family: inherit;
+}
+.sql-preview {
+  background: #1c1c1e; color: #8ecae6;
+  font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.68rem;
+  padding: 0.5rem 0.7rem; border-radius: 6px;
+  margin-top: 0.4rem; white-space: pre-wrap;
+}
+
+.chat-input { display: flex; gap: 0.6rem; align-items: center; }
+.chat-input input {
+  flex: 1; border: 1px solid #dedad4; border-radius: 10px;
+  padding: 0.65rem 1rem; font-size: 0.85rem;
+  font-family: inherit; outline: none;
+  background: #f8f7f5; color: #1c1c1e;
+  transition: border-color 0.15s, background 0.15s;
+}
+.chat-input input:focus { border-color: #888780; background: #fff; }
+.chat-input button {
+  background: #1c1c1e; color: #f5f5f0;
+  border: none; border-radius: 10px;
+  padding: 0.65rem 1.2rem; cursor: pointer;
+  font-size: 0.82rem; font-weight: 600;
+  font-family: inherit; white-space: nowrap;
+  transition: opacity 0.15s;
+}
+.chat-input button:hover { opacity: 0.8; }
+
+.results-wrap { margin-top: 1rem; }
+.results-wrap table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+.results-wrap th {
+  background: #1c1c1e; color: #f5f5f0;
+  padding: 0.5rem 0.8rem; text-align: left;
+  font-weight: 500; font-size: 0.72rem; letter-spacing: 0.04em;
+}
+.results-wrap th:first-child { border-radius: 8px 0 0 0; }
+.results-wrap th:last-child  { border-radius: 0 8px 0 0; }
+.results-wrap td { padding: 0.45rem 0.8rem; border-bottom: 1px solid #f0ede8; color: #3a3a36; }
+.results-wrap tr:hover td { background: #f8f7f5; }
 </style>
-</head>
-<body>
+
 <header>
-  <span style="font-size:2rem">🐄</span>
-  <div><h1>BoviBot</h1><small>Assistant IA — Gestion d'Élevage Bovin</small></div>
+  <div class="header-left">
+    <div class="logo-mark">
+      <svg viewBox="0 0 20 20" fill="none">
+        <ellipse cx="10" cy="9" rx="6" ry="5" stroke="#1c1c1e" stroke-width="1.5"/>
+        <circle cx="6" cy="6" r="1.2" fill="#1c1c1e"/>
+        <circle cx="14" cy="6" r="1.2" fill="#1c1c1e"/>
+        <path d="M7 14.5 Q10 17 13 14.5" stroke="#1c1c1e" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div>
+      <div class="header-title">BoviBot</div>
+      <div class="header-sub">Gestion d'élevage bovin — Assistant IA</div>
+    </div>
+  </div>
+  <div class="header-badge" id="header-date">Chargement...</div>
 </header>
 
-<div class="container">
-  <!-- Colonne gauche -->
+<div class="layout">
   <div>
     <div class="card">
-      <h2>📊 Tableau de bord</h2>
-      <div class="stats-grid" id="stats">
-        <div class="stat"><div class="val" id="s-actifs">—</div><div class="lbl">Animaux actifs</div></div>
-        <div class="stat"><div class="val" id="s-gestation">—</div><div class="lbl">En gestation</div></div>
-        <div class="stat"><div class="val" id="s-alertes">—</div><div class="lbl">Alertes actives</div></div>
-        <div class="stat critical"><div class="val" id="s-critical">—</div><div class="lbl">Alertes critiques</div></div>
-        <div class="stat"><div class="val" id="s-ventes">—</div><div class="lbl">Ventes ce mois</div></div>
-        <div class="stat"><div class="val" id="s-ca">—</div><div class="lbl">CA mois (FCFA)</div></div>
+      <div class="section-label">Vue d'ensemble</div>
+      <div class="stats-list" id="stats">
+        <div class="stat-row">
+          <div class="stat-icon" style="background:#f0ede8">
+            <svg viewBox="0 0 14 14" fill="none"><ellipse cx="7" cy="6" rx="4" ry="3" stroke="#5a5a52" stroke-width="1.2"/><circle cx="4.5" cy="4" r="0.8" fill="#5a5a52"/><circle cx="9.5" cy="4" r="0.8" fill="#5a5a52"/></svg>
+          </div>
+          <span class="stat-lbl">Animaux actifs</span>
+          <span class="stat-val" id="s-actifs">—</span>
+        </div>
+        <div class="stat-row">
+          <div class="stat-icon" style="background:#edf7f2">
+            <svg viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="4.5" stroke="#1a7a4a" stroke-width="1.2"/><circle cx="7" cy="7" r="2" fill="#1a7a4a"/></svg>
+          </div>
+          <span class="stat-lbl">En gestation</span>
+          <span class="stat-val" id="s-gestation">—</span>
+        </div>
+        <div class="stat-row">
+          <div class="stat-icon" style="background:#fdf6eb">
+            <svg viewBox="0 0 14 14" fill="none"><path d="M7 2L8.5 6H12.5L9.2 8.5L10.5 12L7 9.5L3.5 12L4.8 8.5L1.5 6H5.5Z" stroke="#c87d2e" stroke-width="1.1" fill="none"/></svg>
+          </div>
+          <span class="stat-lbl">Alertes actives</span>
+          <span class="stat-val" id="s-alertes">—</span>
+        </div>
+        <div class="stat-row">
+          <div class="stat-icon" style="background:#fdf0ef">
+            <svg viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5" stroke="#c0392b" stroke-width="1.2"/><line x1="7" y1="4" x2="7" y2="7.5" stroke="#c0392b" stroke-width="1.4" stroke-linecap="round"/><circle cx="7" cy="9.5" r="0.7" fill="#c0392b"/></svg>
+          </div>
+          <span class="stat-lbl">Alertes critiques</span>
+          <span class="stat-val danger" id="s-critical">—</span>
+        </div>
+        <div class="stat-row">
+          <div class="stat-icon" style="background:#edf7f2">
+            <svg viewBox="0 0 14 14" fill="none"><rect x="2" y="5" width="10" height="7" rx="1.5" stroke="#1a7a4a" stroke-width="1.2"/><path d="M5 5V4a2 2 0 014 0v1" stroke="#1a7a4a" stroke-width="1.2"/></svg>
+          </div>
+          <span class="stat-lbl">Ventes ce mois</span>
+          <span class="stat-val success" id="s-ventes">—</span>
+        </div>
+        <div class="stat-row">
+          <div class="stat-icon" style="background:#f0ede8">
+            <svg viewBox="0 0 14 14" fill="none"><path d="M2 10L5 7L8 9L12 4" stroke="#5a5a52" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <span class="stat-lbl">CA mois (FCFA)</span>
+          <span class="stat-val" id="s-ca">—</span>
+        </div>
       </div>
     </div>
 
     <div class="card">
-      <h2>⚠️ Alertes récentes</h2>
-      <div id="alertes-list"><p style="color:#94a3b8;font-size:0.85rem">Chargement...</p></div>
+      <div class="section-label">Alertes récentes</div>
+      <div id="alertes-list"><p style="color:#a0a09a;font-size:0.79rem">Chargement...</p></div>
     </div>
 
     <div class="card">
-      <h2>🍼 Gestations en cours</h2>
-      <div id="gestations-list"><p style="color:#94a3b8;font-size:0.85rem">Chargement...</p></div>
+      <div class="section-label">Gestations en cours</div>
+      <div id="gestations-list"><p style="color:#a0a09a;font-size:0.79rem">Chargement...</p></div>
     </div>
   </div>
 
-  <!-- Colonne droite : Chat -->
-  <div class="card">
-    <h2>💬 Assistant BoviBot</h2>
+  <div class="card" style="display:flex;flex-direction:column;">
+    <div class="section-label">Assistant</div>
     <div class="suggestions">
       <button onclick="ask('Liste tous les animaux actifs avec leur âge et GMQ')">Troupeau complet</button>
       <button onclick="ask('Quels animaux ont un GMQ inférieur à 0.3 kg/jour ?')">GMQ faibles</button>
       <button onclick="ask('Quelles femelles sont en gestation et quand vêlent-elles ?')">Gestations</button>
       <button onclick="ask('Quels animaux n\'ont pas été vaccinés depuis 6 mois ?')">Vaccinations</button>
       <button onclick="ask('Enregistre une pesée de 325 kg pour TAG-001 aujourd\'hui')">Saisir pesée</button>
-      <button onclick="ask('Quel est le coût total d\'alimentation ce mois-ci ?')">Coût alim.</button>
+      <button onclick="ask('Quel est le coût total d\'alimentation ce mois-ci ?')">Coût alimentation</button>
     </div>
 
     <div class="chat-box" id="chat-box">
       <div class="msg bot">
-        <div class="bubble">🐄 Bonjour ! Je suis BoviBot.<br>Posez vos questions sur votre troupeau ou demandez-moi d'enregistrer une pesée, une vente...</div>
+        <div class="bubble">Bonjour — je suis BoviBot.<br>Posez vos questions sur votre troupeau ou demandez-moi d'enregistrer une pesée, une vente, une vaccination...</div>
       </div>
     </div>
 
     <div class="chat-input">
-      <input type="text" id="user-input" placeholder="Ex: Quel animal a le meilleur GMQ ce mois ?" onkeypress="if(event.key==='Enter') sendMessage()">
-      <button onclick="sendMessage()">Envoyer ➤</button>
+      <input type="text" id="user-input" placeholder="Ex : Quel animal a le meilleur GMQ ce mois ?" onkeypress="if(event.key==='Enter') sendMessage()">
+      <button onclick="sendMessage()">Envoyer</button>
     </div>
 
-    <div id="results-section" style="margin-top:1rem;display:none">
-      <h2>📋 Résultats</h2>
-      <div class="results" id="results-table"></div>
+    <div id="results-section" class="results-wrap" style="display:none">
+      <div class="section-label" style="margin-top:1rem;margin-bottom:0.6rem">Résultats</div>
+      <div id="results-table"></div>
     </div>
   </div>
 </div>
@@ -116,6 +287,9 @@
 const API = '';
 let pendingAction = null;
 let history = [];
+
+const now = new Date();
+document.getElementById('header-date').textContent = now.toLocaleDateString('fr-SN', {day:'numeric', month:'long', year:'numeric'});
 
 async function loadDashboard() {
   try {
@@ -133,11 +307,15 @@ async function loadAlertes() {
   try {
     const data = await fetch(`${API}/api/alertes`).then(r=>r.json());
     const el = document.getElementById('alertes-list');
-    if (!data.length) { el.innerHTML = '<p style="color:#22c55e;font-size:0.85rem">✅ Aucune alerte active</p>'; return; }
+    if (!data.length) { el.innerHTML = '<p style="color:#1a7a4a;font-size:0.79rem">Aucune alerte active</p>'; return; }
     el.innerHTML = data.slice(0,6).map(a => `
-      <div class="alerte-item alerte-${a.niveau}">
-        <span>${a.animal_tag ? '['+a.animal_tag+'] ' : ''}${a.message}</span>
-        <button onclick="traiterAlerte(${a.id})" title="Marquer comme traitée">✓</button>
+      <div class="alerte alerte-${a.niveau}">
+        <div class="alerte-dot"></div>
+        <div style="flex:1">
+          ${a.animal_tag ? `<div class="alerte-tag">${a.animal_tag}</div>` : ''}
+          <div class="alerte-msg">${a.message}</div>
+        </div>
+        <button class="alerte-dismiss" onclick="traiterAlerte(${a.id})" title="Traiter">&#10003;</button>
       </div>`).join('');
   } catch(e) {}
 }
@@ -146,12 +324,15 @@ async function loadGestations() {
   try {
     const data = await fetch(`${API}/api/reproduction/en-cours`).then(r=>r.json());
     const el = document.getElementById('gestations-list');
-    if (!data.length) { el.innerHTML = '<p style="color:#94a3b8;font-size:0.85rem">Aucune gestation en cours</p>'; return; }
-    el.innerHTML = data.map(g => `
-      <div style="padding:0.4rem 0;border-bottom:1px solid #f0e8d8;font-size:0.85rem">
-        🐄 <strong>${g.mere_tag}</strong> × ${g.pere_tag} — Vêlage : <strong>${g.date_velage_prevue}</strong>
-        <span style="color:${g.jours_restants<14?'#dc2626':'#16a34a'};font-weight:bold"> (J-${g.jours_restants})</span>
-      </div>`).join('');
+    if (!data.length) { el.innerHTML = '<p style="color:#a0a09a;font-size:0.79rem">Aucune gestation en cours</p>'; return; }
+    el.innerHTML = data.map(g => {
+      const urgente = g.jours_restants < 14;
+      return `<div class="gestation-row">
+        <div class="g-bar ${urgente?'urgent':'ok'}"></div>
+        <div class="g-names"><strong>${g.mere_tag}</strong> &times; ${g.pere_tag}<br><span style="color:#8a8a80;font-size:0.71rem">${g.date_velage_prevue}</span></div>
+        <span class="g-tag ${urgente?'urgent':'ok'}">J-${g.jours_restants}</span>
+      </div>`;
+    }).join('');
   } catch(e) {}
 }
 
@@ -178,18 +359,18 @@ async function confirmAction(yes) {
   if (!pendingAction) return;
   document.getElementById('confirm-div')?.remove();
   if (yes) {
-    addMessage('bot', '⏳ Exécution en cours...');
+    addMessage('bot', 'Exécution en cours...');
     const r = await fetch(`${API}/api/chat`, {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({question:'', confirm_action:true, pending_action:pendingAction})
     });
     const data = await r.json();
     document.querySelector('.msg.bot:last-child')?.remove();
-    addMessage('bot', data.answer || 'Action effectuée !');
+    addMessage('bot', data.answer || 'Action effectuée.');
     pendingAction = null;
     loadDashboard(); loadAlertes();
   } else {
-    addMessage('bot', '❌ Action annulée.');
+    addMessage('bot', 'Action annulée.');
     pendingAction = null;
   }
 }
@@ -201,7 +382,7 @@ async function sendMessage() {
   input.value = '';
   addMessage('user', question);
   history.push({role:'user', content:question});
-  const loading = addMessage('bot', '⏳ Analyse en cours...');
+  const loading = addMessage('bot', 'Analyse en cours...');
 
   try {
     const r = await fetch(`${API}/api/chat`, {
@@ -216,10 +397,10 @@ async function sendMessage() {
       const confirmDiv = document.createElement('div');
       confirmDiv.id = 'confirm-div';
       confirmDiv.className = 'msg confirm';
-      confirmDiv.innerHTML = `<div class="bubble">⚠️ ${data.confirmation}<div class="confirm-btns"><button class="btn-oui" onclick="confirmAction(true)">✅ Confirmer</button><button class="btn-non" onclick="confirmAction(false)">❌ Annuler</button></div></div>`;
+      confirmDiv.innerHTML = `<div class="bubble">${data.confirmation}<div class="confirm-btns"><button class="btn-oui" onclick="confirmAction(true)">Confirmer</button><button class="btn-non" onclick="confirmAction(false)">Annuler</button></div></div>`;
       document.getElementById('chat-box').appendChild(confirmDiv);
     } else {
-      addMessage('bot', data.answer + (data.count !== undefined ? ` (${data.count} résultat${data.count>1?'s':''})` : ''), data.sql);
+      addMessage('bot', data.answer + (data.count !== undefined ? ` <span style="color:#a0a09a;font-size:0.74rem">(${data.count} résultat${data.count>1?'s':''})</span>` : ''), data.sql);
       history.push({role:'assistant', content: data.answer});
     }
 
@@ -229,14 +410,11 @@ async function sendMessage() {
       const rows = data.data.map(row=>`<tr>${keys.map(k=>`<td>${row[k]??''}</td>`).join('')}</tr>`).join('');
       document.getElementById('results-table').innerHTML = `<table><thead><tr>${keys.map(k=>`<th>${k}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>`;
     }
-    document.getElementById('chat-box').scrollTop = 9999;
   } catch(e) {
     loading.remove();
-    addMessage('bot', '❌ Erreur de connexion au serveur.');
+    addMessage('bot', 'Erreur de connexion au serveur.');
   }
 }
 
 loadDashboard(); loadAlertes(); loadGestations();
 </script>
-</body>
-</html>
